@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0d0a14">
+  <title>VEXORA | Boost Generator</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      padding: 24px; color: #f4eaff; font-family: Inter, system-ui, Arial, sans-serif;
+      background: radial-gradient(ellipse at 50% 0%, #382052 0%, #171020 38%, #09070e 100%);
+    }
+    .panel {
+      width: min(100%, 560px); padding: 30px; border-radius: 24px;
+      background: rgba(18, 13, 27, .94); border: 1px solid #583777;
+      box-shadow: 0 22px 80px #0009, 0 0 38px #9b4dce20;
+    }
+    header { text-align: center; padding: 18px 10px 28px; }
+    .bolt { font-size: 38px; color: #c084fc; filter: drop-shadow(0 0 14px #b56cff); }
+    h1 { margin: 8px 0 0; letter-spacing: .16em; font-size: clamp(28px, 7vw, 38px); }
+    .subtitle { margin-top: 7px; color: #c084fc; letter-spacing: .2em; font-size: 12px; font-weight: 800; }
+    .label { display: block; margin: 12px 0 10px; color: #cdb9e2; font-size: 12px; font-weight: 800; letter-spacing: .12em; }
+    .quantities { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    button {
+      border: 1px solid #68428b; border-radius: 12px; padding: 13px 16px;
+      color: #f7edff; background: #21172d; font-weight: 800; cursor: pointer;
+      transition: .18s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: #c084fc; box-shadow: 0 0 18px #a855f733; }
+    button.selected, .primary { background: linear-gradient(135deg, #8b42c5, #602b9b); border-color: #b77ae8; }
+    .primary { width: 100%; margin-top: 16px; padding: 15px; letter-spacing: .08em; }
+    .results { margin-top: 22px; }
+    .results-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .count { color: #d8b4fe; font-size: 12px; }
+    .code-list {
+      margin-top: 12px; padding: 8px; border: 1px solid #382748; border-radius: 14px;
+      background: #100c17; max-height: 310px; overflow: auto;
+    }
+    .code-row { display: flex; align-items: center; gap: 8px; padding: 9px 7px; border-bottom: 1px solid #2a2035; }
+    .code-row:last-child { border-bottom: 0; }
+    .code { min-width: 0; overflow-wrap: anywhere; color: #e6d5f5; font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .copy-one { flex: 0 0 auto; padding: 7px 10px; font-size: 11px; }
+    .copy-all { width: 100%; margin-top: 10px; }
+    .empty { margin-top: 18px; padding: 26px 12px; text-align: center; color: #a995bb; background: #100c17; border: 1px solid #382748; border-radius: 14px; }
+    .toast { min-height: 18px; margin-top: 10px; color: #c4a0e8; text-align: center; font-size: 12px; }
+    @media (max-width: 420px) { .panel { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <header>
+      <div class="bolt">ϟ</div>
+      <h1>VEXORA</h1>
+      <div class="subtitle">BOOST GENERATOR</div>
+    </header>
+
+    <label class="label">SELECT QUANTITY</label>
+    <div class="quantities" role="group" aria-label="Number of codes">
+      <button class="selected" data-count="10" aria-pressed="true">10</button>
+      <button data-count="50" aria-pressed="false">50</button>
+      <button data-count="100" aria-pressed="false">100</button>
+    </div>
+
+    <button class="primary" id="generate">✦ &nbsp; GENERATE CODES</button>
+
+    <section class="results" aria-live="polite">
+      <div class="results-head">
+        <span class="label" style="margin:0">GENERATED CODES</span>
+        <span class="count" id="count"></span>
+      </div>
+      <div id="output" class="empty">Waiting for generation...</div>
+      <button id="copyAll" class="copy-all" hidden>▣ &nbsp; COPY ALL</button>
+      <div class="toast" id="toast"></div>
+    </section>
+  </main>
+
+  <script>
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let quantity = 10;
+    let generated = [];
+
+    document.querySelectorAll("[data-count]").forEach(button => {
+      button.addEventListener("click", () => {
+        quantity = Number(button.dataset.count);
+        document.querySelectorAll("[data-count]").forEach(item => {
+          const active = item === button;
+          item.classList.toggle("selected", active);
+          item.setAttribute("aria-pressed", String(active));
+        });
+      });
+    });
+
+    function randomCode(length = 24) {
+      const values = new Uint32Array(length);
+      crypto.getRandomValues(values);
+      return Array.from(values, value => alphabet[value % alphabet.length]).join("");
+    }
+
+    function showToast(message) {
+      document.getElementById("toast").textContent = message;
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("Copied to clipboard!");
+      } catch {
+        showToast("Clipboard access is unavailable in this browser.");
+      }
+    }
+
+    function renderCodes() {
+      const output = document.getElementById("output");
+      output.className = "code-list";
+      output.replaceChildren();
+
+      generated.forEach(code => {
+        const row = document.createElement("div");
+        row.className = "code-row";
+        const span = document.createElement("span");
+        span.className = "code";
+        span.textContent = code;
+        const button = document.createElement("button");
+        button.className = "copy-one";
+        button.textContent = "COPY";
+        button.addEventListener("click", () => copyText(code));
+        row.append(span, button);
+        output.append(row);
+      });
+
+      document.getElementById("count").textContent = `${generated.length} codes`;
+      document.getElementById("copyAll").hidden = false;
+      showToast("");
+    }
+
+    document.getElementById("generate").addEventListener("click", () => {
+      generated = Array.from({ length: quantity }, () => randomCode());
+      renderCodes();
+    });
+
+    document.getElementById("copyAll").addEventListener("click", () => {
+      copyText(generated.join("\n"));
+    });
+  </script>
+</body>
+</html>
